@@ -1,12 +1,17 @@
 import axios from "axios";
 
-const API = axios.create({ baseURL: "http://localhost:5000/api" });
+const BASE_URL = "http://localhost:5000/api";
+const FLASK_API = "http://localhost:5001"; // Flask AI API
 
-export const getNurses = () => API.get("/nurses");
-export const updateNurse = (id, data) => API.put(`/nurses/${id}`, data);
+// 🩺 Nurse CRUD APIs
+export const getNurses = () => axios.get(`${BASE_URL}/nurses`);
+export const updateNurse = (id, data) => axios.put(`${BASE_URL}/nurses/${id}`, data);
 
-// ✅ call the backend proxy which calls Python optimizer
-export const optimizeAssignments = (patientsToAssign) =>
-  API.post("/optimize", { patientsToAssign });
+// 🧠 AI Optimization & Balancing APIs
+export const getBalance = () => axios.get(`${BASE_URL}/balance`);
+export const optimizeAssignments = (payload) =>
+  axios.post(`${BASE_URL}/optimize`, payload);
 
-export default API;
+// ✅ AI Fatigue Prediction — Direct call to Flask (CHANGED)
+export const predictFatigue = (payload) =>
+  axios.post(`${FLASK_API}/predict`, payload);
