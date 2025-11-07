@@ -1,44 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { Activity, Calendar, Award, TrendingDown, AlertCircle } from "lucide-react";
+import { getNurses, updateNurse } from "./api"; // ✅ All imports at the top
 
-export default function NurseFatigueDashboard({ nurses = [] }) {
-  const [localNurses, setLocalNurses] = useState([]);
+export default function NurseFatigueDashboard() {
+  const [nurses, setNurses] = useState([]);
 
-  // Whenever new data comes from backend, update local state
+  // 🧠 Fetch nurses from MongoDB
   useEffect(() => {
-    if (nurses.length > 0) {
-      setLocalNurses(nurses);
-    }
-  }, [nurses]);
+    getNurses()
+      .then((res) => {
+        console.log("📦 Nurses fetched:", res.data);
+        setNurses(res.data);
+      })
+      .catch((err) => console.error("❌ Error fetching nurses:", err));
+  }, []);
 
-  // If there are no nurses from backend yet, display default placeholders
-  const displayNurses =
-    localNurses.length > 0
-      ? localNurses
-      : [
-          {
-            id: 1,
-            name: "Alice",
-            experience: 5,
-            lastLeave: "2025-10-28",
-            patients: { A1: 0, A2: 0, A3: 0, A4: 0, A5: 0 },
-            score: 100,
-            status: "Fresh",
-            recommendation: "Assign A1–A3",
-          },
-          {
-            id: 2,
-            name: "Ben",
-            experience: 3,
-            lastLeave: "2025-11-02",
-            patients: { A1: 0, A2: 0, A3: 0, A4: 0, A5: 0 },
-            score: 100,
-            status: "Fresh",
-            recommendation: "Assign A1–A3",
-          },
-        ];
-
-  // Weights for fatigue calculation
   const weights = { A1: 20, A2: 15, A3: 10, A4: 5, A5: 2 };
 
   const calculateFatigue = (nurse) => {
@@ -65,9 +41,10 @@ export default function NurseFatigueDashboard({ nurses = [] }) {
     return { score, status, recommendation };
   };
 
-  const handleInputChange = (id, field, value) => {
-    const updated = displayNurses.map((nurse) => {
-      if (nurse._id === id || nurse.id === id) {
+  // 🧩 When user changes patient inputs
+  const handleInputChange = async (id, field, value) => {
+    const updated = nurses.map((nurse) => {
+      if (nurse._id === id) {
         const newVal = Number(value);
         const updatedNurse = {
           ...nurse,
@@ -79,8 +56,16 @@ export default function NurseFatigueDashboard({ nurses = [] }) {
       return nurse;
     });
 
-    updated.sort((a, b) => a.score - b.score);
-    setLocalNurses(updated);
+    setNurses(updated);
+
+    // Save updated nurse to DB
+    const changed = updated.find((n) => n._id === id);
+    try {
+      await updateNurse(id, changed);
+      console.log("✅ Saved to DB:", changed.name);
+    } catch (error) {
+      console.error("❌ Error saving nurse:", error);
+    }
   };
 
   const getStatusColor = (status) => {
@@ -125,101 +110,48 @@ export default function NurseFatigueDashboard({ nurses = [] }) {
             Real-time workload monitoring and assignment recommendations
           </p>
         </div>
-
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/20 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="bg-emerald-500/20 p-3 rounded-xl">
-                <Activity className="w-6 h-6 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Total Nurses</p>
-                <p className="text-2xl font-bold text-white">{displayNurses.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/20 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="bg-emerald-500/20 p-3 rounded-xl">
-                <Activity className="w-6 h-6 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Available</p>
-                <p className="text-2xl font-bold text-white">
-                  {displayNurses.filter((n) => n.score >= 80).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/20 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="bg-red-500/20 p-3 rounded-xl">
-                <AlertCircle className="w-6 h-6 text-red-400" />
-              </div>
-              <div>
-                <p className="text-gray-400 text-sm">Need Rest</p>
-                <p className="text-2xl font-bold text-white">
-                  {displayNurses.filter((n) => n.score < 40).length}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Nurse Cards */}
       <div className="max-w-7xl mx-auto grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {displayNurses.map((nurse) => (
+        {nurses.map((nurse) => (
           <div
-            key={nurse._id || nurse.id}
+            key={nurse._id}
             className="group relative bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/20 shadow-2xl hover:shadow-purple-500/20 hover:scale-105 transition-all duration-300"
           >
-            {/* Glow effect */}
-            <div
-              className={`absolute inset-0 bg-gradient-to-r ${getStatusColor(
-                nurse.status
-              )} opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity duration-300`}
-            ></div>
-
             {/* Header */}
             <div className="flex justify-between items-start mb-6">
-              <div className="space-y-2">
+              <div>
                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                   {nurse.name}
                   <Award className="w-5 h-5 text-yellow-400" />
                 </h2>
-                <div className="flex items-center gap-2 text-gray-300 text-sm">
-                  <Award className="w-4 h-4" />
-                  <span>{nurse.experience} years exp</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-300 text-sm">
+                <p className="text-gray-300 text-sm flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  <span>Leave: {nurse.lastLeave}</span>
-                </div>
+                  {nurse.experience} years exp
+                </p>
+                <p className="text-gray-400 text-sm">
+                  Leave: {nurse.lastLeave}
+                </p>
               </div>
-
-              {/* Score Circle */}
               <div className="relative">
-                <svg className="w-24 h-24 transform -rotate-90">
+                <svg className="w-20 h-20 transform -rotate-90">
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="40"
+                    cx="40"
+                    cy="40"
+                    r="35"
                     stroke="rgba(255,255,255,0.1)"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="none"
                   />
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="40"
+                    cx="40"
+                    cy="40"
+                    r="35"
                     stroke="url(#gradient)"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="none"
-                    strokeDasharray={`${(nurse.score / 100) * 251.2} 251.2`}
+                    strokeDasharray={`${(nurse.score / 100) * 219.9} 219.9`}
                     strokeLinecap="round"
                     className="transition-all duration-700"
                   />
@@ -249,67 +181,42 @@ export default function NurseFatigueDashboard({ nurses = [] }) {
                   </defs>
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-white">{nurse.score}</span>
+                  <span className="text-2xl font-bold text-white">
+                    {nurse.score}
+                  </span>
                   <span className="text-xs text-gray-400">Energy</span>
                 </div>
               </div>
             </div>
 
             {/* Patient Inputs */}
-            <div className="mb-5">
-              <p className="text-gray-400 text-xs uppercase tracking-wider mb-3 font-semibold">
-                Patient Load
-              </p>
-              <div className="grid grid-cols-5 gap-2">
-                {["A1", "A2", "A3", "A4", "A5"].map((code) => (
-                  <div key={code} className="relative">
-                    <label className="block text-xs text-gray-400 font-semibold mb-1 text-center">
-                      {code}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={nurse.patients?.[code] || 0}
-                      onChange={(e) =>
-                        handleInputChange(nurse._id || nurse.id, code, e.target.value)
-                      }
-                      className="w-full text-center bg-white/5 border border-white/20 rounded-xl py-2 text-white focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50 focus:outline-none transition-all"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Status Bar */}
-            <div className="mb-5">
-              <div className="h-3 bg-white/10 rounded-full overflow-hidden shadow-inner">
-                <div
-                  className={`h-full bg-gradient-to-r ${getStatusColor(
-                    nurse.status
-                  )} transition-all duration-700 rounded-full shadow-lg`}
-                  style={{ width: `${nurse.score}%` }}
-                ></div>
-              </div>
+            <div className="grid grid-cols-5 gap-2 mb-4">
+              {["A1", "A2", "A3", "A4", "A5"].map((code) => (
+                <input
+                  key={code}
+                  type="number"
+                  min="0"
+                  value={nurse.patients[code] || 0}
+                  onChange={(e) =>
+                    handleInputChange(nurse._id, code, e.target.value)
+                  }
+                  className="bg-white/5 border border-white/20 rounded-xl py-2 text-center text-white focus:border-purple-400 focus:ring-2 focus:ring-purple-400/50 outline-none"
+                />
+              ))}
             </div>
 
             {/* Status & Recommendation */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/20">
-                  {getStatusIcon(nurse.status)}
-                  <span className="font-semibold text-white">{nurse.status}</span>
-                </div>
-              </div>
-
-              <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                  Recommendation
-                </p>
-                <p className="text-sm text-purple-200 font-medium">
-                  {nurse.recommendation}
-                </p>
+            <div className="flex items-center justify-between mb-2">
+              <div className={`flex items-center gap-2`}>
+                {getStatusIcon(nurse.status)}
+                <span className="font-semibold text-white">
+                  {nurse.status}
+                </span>
               </div>
             </div>
+            <p className="text-sm text-purple-200 font-medium">
+              {nurse.recommendation}
+            </p>
           </div>
         ))}
       </div>

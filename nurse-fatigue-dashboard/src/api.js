@@ -1,12 +1,9 @@
-// src/api.js
 import axios from "axios";
 
-const API = axios.create({
-  baseURL: "http://localhost:5000/api", // backend base URL
-});
+const API = axios.create({ baseURL: "http://localhost:5000/api" });
 
-// API functions
+// ✅ Get all nurses
 export const getNurses = () => API.get("/nurses");
-export const addNurse = (data) => API.post("/nurses", data);
 
-export default API;
+// ✅ Update nurse by ID
+export const updateNurse = (id, data) => API.put(`/nurses/${id}`, data);
